@@ -32,6 +32,58 @@ RSpec.describe Attachment do
     end
   end
 
+  describe 'webp image handling' do
+    let(:webp_attachment) do
+      attachment = message.attachments.new(account_id: message.account_id, file_type: :image)
+      attachment.file.attach(io: Rails.root.join('spec/assets/sample.webp').open, filename: 'sample.webp', content_type: 'image/webp')
+      attachment
+    end
+
+    let(:png_attachment) do
+      attachment = message.attachments.new(account_id: message.account_id, file_type: :image)
+      attachment.file.attach(io: Rails.root.join('spec/assets/avatar.png').open, filename: 'avatar.png', content_type: 'image/png')
+      attachment
+    end
+
+    describe '#webp_image?' do
+      it 'returns true for webp images' do
+        expect(webp_attachment.webp_image?).to be true
+      end
+
+      it 'returns false for non-webp images' do
+        expect(png_attachment.webp_image?).to be false
+      end
+
+      it 'returns false for non-image attachments' do
+        audio_attachment = message.attachments.new(account_id: message.account_id, file_type: :audio)
+        expect(audio_attachment.webp_image?).to be false
+      end
+    end
+
+    describe '#whatsapp_download_url' do
+      it 'returns converted url for webp images' do
+        expect(webp_attachment.whatsapp_download_url).not_to eq(webp_attachment.download_url)
+        expect(webp_attachment.whatsapp_download_url).to be_present
+      end
+
+      it 'returns regular download_url for non-webp images' do
+        expect(png_attachment.whatsapp_download_url).to eq(png_attachment.download_url)
+      end
+    end
+
+    describe '#converted_image_url' do
+      it 'converts webp to jpeg' do
+        converted_url = webp_attachment.converted_image_url
+        expect(converted_url).to be_present
+        expect(converted_url).not_to eq(webp_attachment.download_url)
+      end
+
+      it 'returns original url for non-webp images' do
+        expect(png_attachment.converted_image_url).to eq(png_attachment.download_url)
+      end
+    end
+  end
+
   describe 'with_attached_file?' do
     it 'returns true if its an attachment with file' do
       attachment = message.attachments.new(account_id: message.account_id, file_type: :image)

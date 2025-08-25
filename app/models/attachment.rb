@@ -59,6 +59,14 @@ class Attachment < ApplicationRecord
     file.attached? ? file.blob.url : ''
   end
 
+  # WhatsApp-specific download URL that converts WebP images to JPEG
+  def whatsapp_download_url
+    return download_url unless webp_image?
+
+    # Convert WebP to JPEG for WhatsApp compatibility
+    converted_image_url
+  end
+
   def thumb_url
     return '' unless file.attached? && image?
 
@@ -171,6 +179,27 @@ class Attachment < ApplicationRecord
 
   def media_file?(file_content_type)
     file_content_type.start_with?('image/', 'video/', 'audio/')
+  end
+
+  def webp_image?
+    return false unless file.attached? && image?
+
+    file.content_type == 'image/webp'
+  end
+
+  def converted_image_url
+    return download_url unless webp_image?
+
+    ActiveStorage::Current.url_options = Rails.application.routes.default_url_options if ActiveStorage::Current.url_options.blank?
+    
+    begin
+      # Create a JPEG variant of the WebP image
+      converted_variant = file.variant(format: :jpeg, quality: 85)
+      converted_variant.processed.url
+    rescue StandardError => e
+      Rails.logger.warn "Failed to convert WebP image to JPEG for attachment #{id}: #{e.message}"
+      download_url
+    end
   end
 end
 
